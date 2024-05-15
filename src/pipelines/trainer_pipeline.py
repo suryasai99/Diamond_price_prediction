@@ -11,6 +11,7 @@ if __name__=='__main__':
     D_I = DataIngestion()
     train_path,test_path = D_I.initiate_data_ingestion()
     print(train_path, test_path)
-    data_trans = DataTransformation()
-    train_arr,test_arr,obj_path = data_trans.initiate_data_transformation(train_path,test_path)
+    data_transformation=DataTransformation()
+
+    train_arr,test_arr,_=data_transformation.initiate_data_transformation(train_path,test_path)
 
