@@ -44,11 +44,11 @@ class CustomData:
     def get_data_as_dataframe(self):
         try:
             CustomData_input_dict = {
-                'carat':self.carat,
-                'table':self.table,
-                'cut':self.cut,
-                'color':self.color,
-                'clarity':self.clarity
+                'carat':[self.carat],
+                'table':[self.table],
+                'cut':[self.cut],
+                'color':[self.color],
+                'clarity':[self.clarity]
             }
             df = pd.DataFrame(CustomData_input_dict)
             logging.info('Dataframe gathered')
