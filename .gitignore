@@ -1,6 +1,7 @@
 # environment
 env_Dpp/
 .DS_store
+*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
