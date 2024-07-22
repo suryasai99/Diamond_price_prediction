@@ -22,10 +22,13 @@ def predict_datapoint():
             table = float(request.form.get('table')),
             cut = request.form.get('cut'),
             color = request.form.get('color'),
-            clarity = request.form.get('clarity')
+            clarity = request.form.get('clarity'),
+            depth = float(request.form.get('depth')),
+            x = float(request.form.get('x')),
+            y = float(request.form.get('y')),
+            z = float(request.form.get('z'))
         )
         
-
         convert_data = data.get_data_as_dataframe()
         result = PredictPipeline().predict(convert_data)
 

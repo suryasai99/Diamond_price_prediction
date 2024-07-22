@@ -48,7 +48,20 @@
             <option value="IF">IF</option>
         </select><br>
 
+        <label for="depth">Depth:</label>
+        <input type="text" id="depth" name="depth" placeholder="Enter Depth value (float)"><br>
+
+        <label for="x">X:</label>
+        <input type="x" id="x" name="x" placeholder="Enter X value (float)"><br>
+
+        <label for="y">Y:</label>
+        <input type="y" id="y" name="y" placeholder="Enter Y value (float)"><br>
+
+        <label for="z">Z:</label>
+        <input type="z" id="z" name="z" placeholder="Enter Z value (float)"><br>
+
         <input type="submit" value="Submit">
+        
     </form>
     {% if final_result %}
     <h2>Prediction Result of Diamond is: {{ final_result }}</h2>
