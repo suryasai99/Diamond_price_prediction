@@ -2,65 +2,56 @@ import pandas as pd
 import numpy as np
 from src.logger import logging
 from src.exception import CustomException
-from src.utils import save_object,evaluate_model
 import sys,os
-from dataclasses import dataclass
 from sklearn.linear_model import LinearRegression,Ridge,Lasso,ElasticNet
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 
-@dataclass
-class ModelTrainerconfig:
-    trained_model_file_path = os.path.join('artifacts/model.pkl')
+from src.utils import(save_object,
+                      load_numpy_array_data)
+
+from src.entity.artifact_entity import(DataTransformationArtifact,
+                                       ModelTrainingArtifacts)
+from src.entity.config_entity import ModelTrainingConfig
+from src.constants.training_pipeline import *
 
 class ModelTrainer:
-    def __init__(self):
-        self.trained_model_config = ModelTrainerconfig()
+    def __init__(self,
+                 data_transformation_artifact:DataTransformationArtifact,
+                 model_training_config:ModelTrainingConfig): 
+        
+        self.data_transformation_artifact = data_transformation_artifact
+        self.model_training_config = model_training_config
 
-    def initiate_model_training(self,train_array,test_array):
+    def initiate_model_training(self):
         try:
-            logging.info('splitting dependent and independent variables from train and test data')
-            x_train,y_train,x_test,y_test = (
-                train_array[:,:-1],
-                train_array[:,-1],
-                test_array[:,:-1],
-                test_array[:,-1]
-            )
+            # importing x_train and y_train from data transformation artifacts
+            x_train = load_numpy_array_data(self.data_transformation_artifact.x_train_filepath)
+            y_train = load_numpy_array_data(self.data_transformation_artifact.y_train_filepath)
+            logging.info('imported x_train and y_train')
 
-            models = {
-                'linear_regression':LinearRegression(),
-                'lasso':Lasso(),
-                'ridge':Ridge(),
-                'elastic_net':ElasticNet(),
-                'random_forest': RandomForestRegressor(),
-                'DT_regressor': DecisionTreeRegressor(),
-                'KNN_regressor':KNeighborsRegressor()
-            }
+            random_forest = RandomForestRegressor(random_state = 42,
+                                                  oob_score = True)
+            
+            # fitting x_train and y_train to random forest model
+            model = random_forest.fit(x_train, y_train)
+            logging.info('fit the random_forest model to x_train and y_train')
 
-            model_report = evaluate_model(x_train,y_train,x_test,y_test,models)
-            logging.info(f'Model Report : {model_report}')
-
-            # TO get best model from dictionary
-            best_model_score = max(sorted(model_report.values()))
-
-            # To get best model name
-            best_model_name = list(model_report.keys())[
-                list(model_report.values()).index(best_model_score)
-            ]
-
-            best_model = models[best_model_name]
-
-            print(f'best model name: {best_model_name} , r2score : {best_model_score}')
-            logging.info(f'best model name: {best_model_name} , r2score : {best_model_score}')
-
+            # saving the model 
             save_object(
-                file_path = self.trained_model_config.trained_model_file_path,
-                obj = best_model
-
+                file_path = self.model_training_config.model_training_file_path,
+                obj = model
             )
+            logging.info('saved the model')
 
+            # model training artifacts
+            model_training_artifacts = ModelTrainingArtifacts(
+                model_filepath = self.model_training_config.model_training_file_path
+            )
+            logging.info('file path saved in model training artifacts')
+            return model_training_artifacts
 
         except Exception as e:
-            logging.info('error occured in training')
+            logging.info('error occured in initiate_model_training module')
             raise CustomException(e,sys)

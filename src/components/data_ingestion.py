@@ -1,52 +1,65 @@
+# importing libraries
 import os
 import sys
 from src.logger import logging
 from src.exception import CustomException
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from dataclasses import dataclass 
+from src.constants.training_pipeline import *
+from src.entity.artifact_entity import DataIngestionArtifact
+from src.entity.config_entity import DataIngestionConfig
 
-## initialize the data indestion configuration
-
-@dataclass
-class DataIngestionconfig:
-    train_data_path = os.path.join('artifacts','train.csv')
-    test_data_path = os.path.join('artifacts','test.csv')
-    raw_data_path = os.path.join('artifacts','raw.csv')
-
-# create DataIngestion class:
+# DataIngestion class:
 class DataIngestion:
-    def __init__(self):
-        self.ingestion_config = DataIngestionconfig()
+    def __init__(self, data_ingestion_config:DataIngestionConfig):
+        self.data_ingestion_config = data_ingestion_config
+
+    @staticmethod
+    def read_data(file_path):
+        try:
+            logging.info(f'reading the csv file from file path:{file_path}')
+            return pd.read_csv(file_path)
+        
+        except Exception as e:
+            logging.info(f'error occured while reading the csv file from file path:{file_path}')
+            return CustomException(e,sys)
     
     def initiate_data_ingestion(self):
-        logging.info('Data ingestion method starts')
-
         try:
-            df = pd.read_csv(os.path.join('notebooks/data/gemstone.csv'))
-            logging.info('original Dataset imported into dataframe from csv file')
 
-            # In case If we dont have artifacts folder. we need to create it
-            os.makedirs(os.path.dirname(self.ingestion_config.raw_data_path), exist_ok = True)
-            df.to_csv(self.ingestion_config.raw_data_path) # used if our data is not in csv format
-            logging.info('Raw data is created')
+            # reading the original data
+            df = DataIngestion.read_data(self.data_ingestion_config.original_data_filepath)
+            logging.info(f'original Dataset imported into dataframe from csv file{df.head()}')
 
             # dividing training and testing data
-            train_data,test_data = train_test_split(df, test_size=0.3, random_state=42)
+            train_data,test_data = train_test_split(df, 
+                                                    test_size = TRAIN_TEST_SPLIT_RATIO, 
+                                                    random_state = RANDOM_STATE)
+            logging.info('divided train and test data')
+            
+            # In case If we dont have artifacts folder. we need to create it
+            os.makedirs(os.path.dirname(self.data_ingestion_config.training_file_path), exist_ok = True)
+
 
             # saving it in the artifacts path
-            train_data.to_csv(self.ingestion_config.train_data_path, 
+            train_data.to_csv(self.data_ingestion_config.training_file_path, 
                               index = False,
                               header = True)
-            test_data.to_csv(self.ingestion_config.test_data_path,
+            
+            test_data.to_csv(self.data_ingestion_config.testing_file_path,
                              index = False,
                              header = True)
+            logging.info('saved train and test data to csv')
             
-            logging.info('Ingestion of Data is completed')
+            # saving the artifacts
+            data_ingestion_artifact = DataIngestionArtifact(
+                train_filepath = self.data_ingestion_config.training_file_path,
+                test_filepath = self.data_ingestion_config.testing_file_path
+            )
+            
+            logging.info('train and test path sent to data ingestion artifacts')
 
-            return(self.ingestion_config.train_data_path,
-                   self.ingestion_config.test_data_path)
+            return data_ingestion_artifact
 
         except Exception as e:
-            logging.info('Exception occured at Data Ingestion stage')
             raise CustomException(e,sys)
