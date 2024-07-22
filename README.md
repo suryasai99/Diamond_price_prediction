@@ -22,5 +22,5 @@ Dataset Source Link :
 [https://www.kaggle.com/competitions/playground-series-s3e8/data?select=train.csv](https://www.kaggle.com/competitions/playground-series-s3e8/data?select=train.csv)
 
 
-**R2_score** is 97.71 with random forest model
-The entire code will be in the **src** folder
+* **R2_score** is 97.71 with random forest model
+* The entire code will be in the **src** folder
