@@ -3,7 +3,6 @@ import numpy as np
 import sys,os,pickle
 from src.logger import logging
 from src.exception import CustomException
-from sklearn.metrics import r2_score,mean_absolute_error,mean_squared_error
 import yaml
 
 def save_object(file_path, obj):
