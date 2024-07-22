@@ -1,126 +1,147 @@
+# importing libraries
 import pandas as pd
 import numpy as np
+import sys,os
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler,OrdinalEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
-
 from src.logger import logging
 from src.exception import CustomException
-from src.utils import save_object
-import sys,os
-from dataclasses import dataclass
-
-@dataclass
-class DataTransformationConfig:
-    preprocessor_obj_file_path = os.path.join('artifacts/preprocessor.pkl')
+from src.utils import(save_object,
+                      save_numpy_array_data)
+from src.entity.artifact_entity import(DataIngestionArtifact,
+                                       DataTransformationArtifact)
+from src.entity.config_entity import DataTransformationConfig
+from src.components.data_ingestion import DataIngestion
+from src.constants.training_pipeline import *
 
 class DataTransformation:
-    def __init__(self):
-        self.data_transformation_config = DataTransformationConfig()
-    
-    def Transformation_pipeline(self,df):
-        try:
-            logging.info('Dividing cols in data into numerical and categorical')
-            # categorical and numerical cols
-            numerical_cols = df.columns[df.dtypes!='object']
-            categorical_cols = df.columns[df.dtypes=='object']
+    def __init__(self,
+                 data_ingestion_artifact:DataIngestionArtifact,
+                 data_transformation_config:DataTransformationConfig):
+        
+        self.data_ingestion_artifact = data_ingestion_artifact
+        self.data_transformation_config = data_transformation_config
 
-            # Define the custom ranking for each ordinal variable
-            cut_categories = [
-                'Fair',
-                'Good',
-                'Very Good',
-                'Premium',
-                'Ideal'
-            ]
-            color_categories = [
-                'D','E',
-                'F','G',
-                'H','I','J'
-            ]    
-            clarity_categories = [
-                'I1','SI2','SI1',
-                'VS2','VS1','VVS2', 
-                'VVS1','IF' 
-            ]
 
-            logging.info('Data transformation pipeline initiated')
+    def get_data_transformation_object(self,data):        
+         try:
+            logging.info('Data Transformation initiated')
+            # Define which columns should be ordinal-encoded and which should be scaled
 
-            # creating a pipeline
-            num_pipeline = Pipeline(
-                steps = [
-                    ('imputer',SimpleImputer(strategy = 'median')),
-                    ('scaler',StandardScaler())
-                ]
-                
-            )
-
-            cat_pipeline = Pipeline(
-                steps = [
-                    ('imputer',SimpleImputer(strategy = 'most_frequent')),
-                    ('scaler',StandardScaler()),
-                    ('ordinalencoder',OrdinalEncoder(categories = [cut_categories, color_categories, clarity_categories]))
-                ]
-            )
-
-            preprocessor = ColumnTransformer([
-                ('num_pipeline', num_pipeline, numerical_cols),
-                ('cat_pipeline', cat_pipeline, categorical_cols)
-            ])
+            categorical_cols = [col for col in data.columns if data[col].dtype == 'O' ]
+            numerical_cols = [col for col in data.columns if data[col].dtype != 'O' ]
             
+            # Define the custom ranking for each ordinal variable
+            cut_categories = ['Fair', 'Good', 'Very Good','Premium','Ideal']
+            color_categories = ['D', 'E', 'F', 'G', 'H', 'I', 'J']
+            clarity_categories = ['I1','SI2','SI1','VS2','VS1','VVS2','VVS1','IF']
+            
+            logging.info('Pipeline Initiated')
 
-            logging.info('Data transformation completed')
+            ## Numerical Pipeline
+            num_pipeline=Pipeline(
+                steps=[
+                ('imputer',SimpleImputer(strategy='median')),
+                ('scaler',StandardScaler())
 
+                ]
+            )
+
+            # Categorigal Pipeline
+            cat_pipeline=Pipeline(
+                steps=[
+                ('imputer',SimpleImputer(strategy='most_frequent')),
+                ('ordinalencoder',OrdinalEncoder(categories=[cut_categories,color_categories,clarity_categories])),
+                ('scaler',StandardScaler())
+                ]
+            )
+
+            # merging numerical and categorical pipelines with column transformer
+            preprocessor=ColumnTransformer([
+            ('num_pipeline',num_pipeline,numerical_cols),
+            ('cat_pipeline',cat_pipeline,categorical_cols)
+            ])
+
+            logging.info('Pipeline Completed')
             return preprocessor
 
-        except Exception as e:
-            logging.info('exception occured during data transformation pipeline')
+         except Exception as e:
+            logging.info("Error in Data Transformation")
             raise CustomException(e,sys)
-        
-    def initiate_data_transformation(self,train_path,test_path):
+         
+
+    def initiate_data_transformation(self):
         try:
-            logging.info('Data Transformation initiated')
-            train_df = pd.read_csv(train_path)
-            test_df = pd.read_csv(test_path)
+            # Reading train and test data
+            train_df = DataIngestion.read_data(self.data_ingestion_artifact.train_filepath)
+            test_df = DataIngestion.read_data(self.data_ingestion_artifact.test_filepath)
 
-            logging.info('Read train and test data completed')
-            #logging.info(f'Train Dataframe Head : \n{train_df.head().to_string()}')
-            #logging.info(f'Test Dataframe Head  : \n{test_df.head().to_string()}')
+            logging.info('imported train and test data')
+            logging.info(f'Train Dataframe Head : \n{train_df.head().to_string()}')
+            logging.info(f'Test Dataframe Head  : \n{test_df.head().to_string()}')
 
-            independent_train = train_df.drop(['price','x','y','z','depth','id'],axis = 1)
-            independent_test = test_df.drop(['price','x','y','z','depth','id'],axis = 1)
-            target_train = train_df['price']
-            target_test = test_df['price']
+            ## independent and dependent features
+            x_train_df = train_df.drop(TARGET,axis=1)
+            y_train_df=train_df[TARGET]
+            x_test_df=test_df.drop(TARGET,axis=1)
+            y_test_df=test_df[TARGET]
+            logging.info('seperated independent and dependent features')
 
-            logging.info(f'Train Dataframe Head : \n{independent_train.head().to_string()}')
-            logging.info(f'Test Dataframe Head  : \n{independent_test .head().to_string()}')
+            # preprocessing object
+            preprocessing_obj = self.get_data_transformation_object(x_train_df)
 
-            logging.info('Obtaining preprocessing object')
-            data_trans_pipeline = self.Transformation_pipeline(independent_train)
+            ## apply the transformation for x_train and x_test
+            input_feature_train_arr = preprocessing_obj.fit_transform(x_train_df)
+            logging.info(f'preprocessing of x_train completed {input_feature_train_arr[1:5,:]}')
+            input_feature_test_arr = preprocessing_obj.transform(x_test_df)
+            logging.info(f'preprocessing of x_test completed {input_feature_test_arr[1:5,:]}')
+            
+            # saving numpy array of x_train
+            save_numpy_array_data(
+                file_path = self.data_transformation_config.x_train_filepath,
+                array = input_feature_train_arr
+            )
 
-            ## apply the transformation pipeline
-            independent_train_arr = data_trans_pipeline.fit_transform(independent_train)
-            independent_test_arr = data_trans_pipeline.transform(independent_test)
+            # saving numpy array of x_test
+            save_numpy_array_data(
+                file_path = self.data_transformation_config.x_test_filepath,
+                array = input_feature_test_arr
+            )
 
-            logging.info("Applied Transformation pipeline on training and testing datasets.")
+            # saving numpy array of y_train
+            save_numpy_array_data(
+                file_path = self.data_transformation_config.y_train_filepath,
+                array = y_train_df
+            )
 
-            train_arr = np.c_(independent_train_arr, np.array(target_train))
-            test_arr = np.c_(independent_test_arr, np.array(target_test))
+            # saving numpy array of y_test
+            save_numpy_array_data(
+                file_path = self.data_transformation_config.y_test_filepath,
+                array = y_test_df
+            )
+            logging.info('saved all the numpy array files')
 
+            # saving preprocessor pickle file
             save_object(
-                file_path = self.data_transformation_config.preprocessor_obj_file_path,
-                obj = data_trans_pipeline
+                file_path = self.data_transformation_config.preprocessor_filepath,
+                obj = preprocessing_obj
+            )
+            logging.info('saved preprocessor pickle file')
+
+            # saving the artifacts
+            data_transformation_artifacts = DataTransformationArtifact(
+                x_train_filepath = self.data_transformation_config.x_train_filepath,
+                y_train_filepath = self.data_transformation_config.y_train_filepath,
+                x_test_filepath = self.data_transformation_config.x_test_filepath,
+                y_test_filepath = self.data_transformation_config.y_test_filepath,
+                preprocessor_filepath = self.data_transformation_config.preprocessor_filepath
             )
 
-            logging.info('Transformation pipeline pickle file created and saved')
-
-            return (
-                train_arr,
-                test_arr,
-                self.data_transformation_config.preprocessor_obj_file_path
-            )
-
+            logging.info('data transformation artifacts created')
+            return data_transformation_artifacts
+        
         except Exception as e:
-            logging.info('Error in Data Transformation')
+            logging.info('error occured in inititate_data_transformation module')
             raise CustomException(e,sys)
